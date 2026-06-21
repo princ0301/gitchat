@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
+
 class SymbolType(str, Enum):
     FILE = "file"
     MODULE = "module"
@@ -8,6 +9,7 @@ class SymbolType(str, Enum):
     FUNCTION = "function"
     METHOD = "method"
     IMPORT = "import"
+
 
 class EdgeType(str, Enum):
     CONTAINS = "contains"
@@ -17,6 +19,7 @@ class EdgeType(str, Enum):
     IMPLEMENTS = "implements"
     INSTANTIATES = "instantiates"
     REFERENCES = "references"
+
 
 @dataclass(frozen=True)
 class Symbol:
@@ -29,12 +32,14 @@ class Symbol:
     signature: str | None = None
     docstring: str | None = None
 
+
 @dataclass(frozen=True)
 class CallReference:
     caller_name: str
     callee_name: str
     file_path: str
     line: int
+
 
 @dataclass(frozen=True)
 class ImportReference:
@@ -43,6 +48,7 @@ class ImportReference:
     source_module: str
     line: int
 
+
 @dataclass(frozen=True)
 class ParseResult:
     file_path: str
@@ -50,3 +56,18 @@ class ParseResult:
     symbols: list[Symbol]
     calls: list[CallReference]
     imports: list[ImportReference]
+
+
+@dataclass(frozen=True)
+class RetrievalResult:
+    node_id: str
+    name: str
+    symbol_type: str
+    file_path: str
+    start_line: int
+    end_line: int
+    text: str
+    vector_score: float | None
+    graph_distance: int | None
+    relevance_score: float
+    source: str

@@ -71,3 +71,59 @@ def add(a, b):
 
     add_symbol = next(s for s in result.symbols if s.name == "add")
     assert add_symbol.signature == "add(a, b)"
+
+
+def test_nested_function_gets_distinct_scope_path():
+    source = """
+def test_one():
+    def hello():
+        return 1
+    return hello()
+
+def test_two():
+    def hello():
+        return 2
+    return hello()
+"""
+    parser = PythonParser()
+    result = parser.parse("sample.py", source)
+
+    nested_hellos = [s for s in result.symbols if s.name == "hello"]
+    assert len(nested_hellos) == 2
+    parent_names = {s.parent_name for s in nested_hellos}
+    assert parent_names == {"test_one", "test_two"}
+
+
+def test_nested_function_is_not_classified_as_method():
+    source = """
+def outer():
+    def inner():
+        return 1
+    return inner()
+"""
+    parser = PythonParser()
+    result = parser.parse("sample.py", source)
+
+    inner_symbol = next(s for s in result.symbols if s.name == "inner")
+    assert inner_symbol.symbol_type == SymbolType.FUNCTION
+    assert inner_symbol.parent_name == "outer"
+
+
+def test_class_nested_inside_function_gets_scope_path():
+    source = """
+def make_class():
+    class Helper:
+        def run(self):
+            return 1
+    return Helper()
+"""
+    parser = PythonParser()
+    result = parser.parse("sample.py", source)
+
+    helper_symbol = next(s for s in result.symbols if s.name == "Helper")
+    assert helper_symbol.symbol_type == SymbolType.CLASS
+    assert helper_symbol.parent_name == "make_class"
+
+    run_symbol = next(s for s in result.symbols if s.name == "run")
+    assert run_symbol.symbol_type == SymbolType.METHOD
+    assert run_symbol.parent_name == "make_class.Helper"

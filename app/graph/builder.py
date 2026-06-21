@@ -8,6 +8,8 @@ class GraphBuilder:
         self._graph_store = graph_store
         self._name_index: dict[str, list[str]] = {}
         self._file_nodes: set[str] = set()
+        self._assigned_node_ids: set[str] = set()
+        self._node_id_by_symbol: dict[int, str] = {}
 
     def build(self, parse_results: list[ParseResult]) -> GraphStore:
         for result in parse_results:
@@ -21,6 +23,9 @@ class GraphBuilder:
             self._resolve_imports(result)
 
         return self._graph_store
+
+    def get_node_id_for_symbol(self, symbol: Symbol) -> str:
+        return self._node_id_by_symbol[id(symbol)]
 
     def _add_file_node(self, file_path: str) -> None:
         file_node_id = file_path
@@ -39,7 +44,8 @@ class GraphBuilder:
     def _add_symbol_nodes(self, result: ParseResult) -> None:
         for symbol in result.symbols:
             qualified_name = build_qualified_name(symbol.name, symbol.parent_name)
-            node_id = build_node_id(symbol.file_path, qualified_name)
+            node_id = self._make_unique_node_id(symbol.file_path, qualified_name, symbol.start_line)
+            self._node_id_by_symbol[id(symbol)] = node_id
             self._graph_store.add_node(node_id, symbol)
             self._graph_store.add_edge(symbol.file_path, node_id, EdgeType.CONTAINS)
             self._index_name(symbol.name, node_id)
@@ -48,6 +54,15 @@ class GraphBuilder:
                 class_node_id = build_node_id(symbol.file_path, symbol.parent_name)
                 if self._graph_store.has_node(class_node_id):
                     self._graph_store.add_edge(class_node_id, node_id, EdgeType.CONTAINS)
+
+    def _make_unique_node_id(self, file_path: str, qualified_name: str, start_line: int) -> str:
+        node_id = build_node_id(file_path, qualified_name)
+        if node_id not in self._assigned_node_ids:
+            self._assigned_node_ids.add(node_id)
+            return node_id
+        disambiguated_id = build_node_id(file_path, f"{qualified_name}@{start_line}")
+        self._assigned_node_ids.add(disambiguated_id)
+        return disambiguated_id
 
     def _index_name(self, name: str, node_id: str) -> None:
         self._name_index.setdefault(name, []).append(node_id)

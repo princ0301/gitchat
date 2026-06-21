@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from app.core.types import Symbol, SymbolType
-from app.core.identity import build_node_id, build_qualified_name
+from app.core.identity import build_qualified_name
 
 CHUNKABLE_TYPES = {SymbolType.FUNCTION, SymbolType.METHOD, SymbolType.CLASS}
 MAX_BODY_CHARS = 2000
@@ -19,12 +19,11 @@ class Chunk:
 
 
 class SymbolChunker:
-    def chunk(self, symbol: Symbol, source_lines: list[str]) -> Chunk | None:
+    def chunk(self, symbol: Symbol, source_lines: list[str], node_id: str) -> Chunk | None:
         if symbol.symbol_type not in CHUNKABLE_TYPES:
             return None
 
         qualified_name = build_qualified_name(symbol.name, symbol.parent_name)
-        node_id = build_node_id(symbol.file_path, qualified_name)
         body = self._extract_body(symbol, source_lines)
         text = self._build_chunk_text(symbol, qualified_name, body)
 
@@ -38,11 +37,17 @@ class SymbolChunker:
             name=symbol.name,
         )
 
-    def chunk_all(self, symbols: list[Symbol], source_lines_by_file: dict[str, list[str]]) -> list[Chunk]:
+    def chunk_all(
+        self,
+        symbols: list[Symbol],
+        source_lines_by_file: dict[str, list[str]],
+        node_id_resolver,
+    ) -> list[Chunk]:
         chunks = []
         for symbol in symbols:
             source_lines = source_lines_by_file.get(symbol.file_path, [])
-            chunk = self.chunk(symbol, source_lines)
+            node_id = node_id_resolver(symbol)
+            chunk = self.chunk(symbol, source_lines, node_id)
             if chunk is not None:
                 chunks.append(chunk)
         return chunks

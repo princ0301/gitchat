@@ -135,3 +135,44 @@ def baz():
     baz_node_id = build_node_id("sample.py", "baz")
     callees = store.get_neighbors(baz_node_id, EdgeType.CALLS, direction="out")
     assert callees == []
+
+
+def test_same_scope_name_collision_gets_unique_node_ids():
+    parser = PythonParser()
+    source = """
+def test_something(apps):
+    class Module:
+        x = 1
+
+    class Module:
+        x = 2
+
+    class Module:
+        x = 3
+"""
+    result = parser.parse("sample.py", source)
+
+    builder = GraphBuilder(NetworkXGraphStore())
+    store = builder.build([result])
+
+    module_nodes = [n for n in store._graph.nodes if "Module" in n]
+    assert len(module_nodes) == 3
+    assert len(set(module_nodes)) == 3
+
+
+def test_first_occurrence_keeps_clean_node_id():
+    parser = PythonParser()
+    source = """
+def test_something(apps):
+    class Module:
+        x = 1
+
+    class Module:
+        x = 2
+"""
+    result = parser.parse("sample.py", source)
+
+    builder = GraphBuilder(NetworkXGraphStore())
+    store = builder.build([result])
+
+    assert store.has_node(build_node_id("sample.py", "test_something.Module"))

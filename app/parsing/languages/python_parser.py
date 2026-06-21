@@ -70,8 +70,8 @@ class PythonParser(LanguageParser):
             if "func.def" in captures:
                 func_node = captures["func.def"][0]
                 name_node = captures["func.name"][0]
-                parent_class = self._find_enclosing_class(func_node)
-                symbol_type = SymbolType.METHOD if parent_class else SymbolType.FUNCTION
+                scope_path = self._find_enclosing_scope_path(func_node)
+                symbol_type = SymbolType.METHOD if self._immediate_parent_is_class(func_node) else SymbolType.FUNCTION
                 symbols.append(
                     Symbol(
                         symbol_type=symbol_type,
@@ -79,7 +79,7 @@ class PythonParser(LanguageParser):
                         file_path=file_path,
                         start_line=func_node.start_point.row + 1,
                         end_line=func_node.end_point.row + 1,
-                        parent_name=parent_class,
+                        parent_name=scope_path,
                         signature=self._extract_signature(func_node),
                         docstring=self._extract_docstring(func_node),
                     )
@@ -87,6 +87,7 @@ class PythonParser(LanguageParser):
             elif "class.def" in captures:
                 class_node = captures["class.def"][0]
                 name_node = captures["class.name"][0]
+                scope_path = self._find_enclosing_scope_path(class_node)
                 symbols.append(
                     Symbol(
                         symbol_type=SymbolType.CLASS,
@@ -94,7 +95,7 @@ class PythonParser(LanguageParser):
                         file_path=file_path,
                         start_line=class_node.start_point.row + 1,
                         end_line=class_node.end_point.row + 1,
-                        parent_name=None,
+                        parent_name=scope_path,
                         signature=None,
                         docstring=self._extract_docstring(class_node),
                     )
@@ -145,14 +146,26 @@ class PythonParser(LanguageParser):
             )
         return imports
 
-    def _find_enclosing_class(self, node: Node) -> str | None:
+    def _immediate_parent_is_class(self, node: Node) -> bool:
         current = node.parent
         while current is not None:
-            if current.type == "class_definition":
-                name_node = current.child_by_field_name("name")
-                return name_node.text.decode("utf-8") if name_node else None
+            if current.type in ("class_definition", "function_definition"):
+                return current.type == "class_definition"
             current = current.parent
-        return None
+        return False
+
+    def _find_enclosing_scope_path(self, node: Node) -> str | None:
+        scopes = []
+        current = node.parent
+        while current is not None:
+            if current.type in ("class_definition", "function_definition"):
+                name_node = current.child_by_field_name("name")
+                if name_node is not None:
+                    scopes.append(name_node.text.decode("utf-8"))
+            current = current.parent
+        if not scopes:
+            return None
+        return ".".join(reversed(scopes))
 
     def _find_enclosing_function(self, node: Node) -> str | None:
         current = node.parent
